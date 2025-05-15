@@ -35,12 +35,20 @@ def main(operator, context):
     if node_active.name != 'Image Texture':
         operator.report({'ERROR'}, "Please select an Image Texture")
         return
-    
-    if node_active.image.filepath == "":
+
+    if node_active.image == None:
         operator.report({'ERROR'}, "Please add an image")
         return
+
     #Copy the image from ImageTexture to plugin input folder
-    shutil.copy2(node_active.image.filepath, absolute_path("input"))
+    # EDIT: Now able to handle packed images (eg. from an import or append)
+    is_packed = False
+    if node_active.image.packed_file != None:
+        node_active.image.filepath = os.path.join(absolute_path("input"), node_active.image.name + ".png")
+        node_active.image.save()
+        is_packed = True
+    else:
+        shutil.copy2(node_active.image.filepath, absolute_path("input"))
 
     import site
     site.addsitedir(absolute_path('.python_dependencies'))
@@ -52,21 +60,34 @@ def main(operator, context):
     originalPath = os.path.dirname(node_active.image.filepath)
     for imgPath in path_iterator(absolute_path("output")):
         fullPath = os.path.join(absolute_path("output"), imgPath)
-        shutil.copy2(fullPath, originalPath)
-        newImage = bpy.data.images.load(os.path.join(originalPath, imgPath))
+        if is_packed == True:
+            newImage = bpy.data.images.load(os.path.join(absolute_path("output"), imgPath))
+            newImage.pack()
+        else:
+            shutil.copy2(fullPath, originalPath)
+            newImage = bpy.data.images.load(os.path.join(originalPath, imgPath))
         images.append(newImage)
 
+    # EDIT: Instead of having them all coalesce in the center
+    #       they now appear under the selected image.
     new_nodes = []
+    node_location = node_active.location
+    loc_y = 300
     for image in images:
         node_new = node_tree.nodes.new(node_active.bl_idname)
         for key, input in enumerate(node_active.inputs):
             node_new.inputs[key].default_value = input.default_value
         node_new.image = image
+        node_new.location.x = node_location.x
+        node_new.location.y = node_location.y - loc_y
+        loc_y = loc_y + 300
         new_nodes.append(node_new)
 
     #Delete all images processed
     delete_files_in_path(absolute_path("input"))
     delete_files_in_path(absolute_path("output"))
+    if is_packed == True:
+        node_active.image.filepath = ""
 
     return new_nodes
 
