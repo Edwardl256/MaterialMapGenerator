@@ -32,7 +32,7 @@ def main(operator, context):
         operator.report({'ERROR'}, "1 node must be selected")
         return
 
-    if node_active.name != 'Image Texture':
+    if node_active.bl_idname != 'ShaderNodeTexImage':
         operator.report({'ERROR'}, "Please select an Image Texture")
         return
 
